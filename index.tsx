@@ -201,12 +201,6 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
-const getTimestampFilename = () => {
-  const now = new Date();
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}-${pad(now.getMinutes())} Idea`;
-};
-
 const getSupportedMimeType = () => {
   if (typeof MediaRecorder === "undefined") return undefined;
   
@@ -227,6 +221,40 @@ const getSupportedMimeType = () => {
   return undefined; // Let the browser decide default
 };
 
+const formatWithTokens = (template: string, content: string = ""): string => {
+  const now = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  
+  const year = now.getFullYear();
+  const month = pad(now.getMonth() + 1);
+  const day = pad(now.getDate());
+  const hour = pad(now.getHours());
+  const minute = pad(now.getMinutes());
+  const second = pad(now.getSeconds());
+
+  const dateStr = `${year}-${month}-${day}`;
+  const timeStr = `${hour}:${minute}`; // Standard time format
+
+  const replacements: Record<string, string> = {
+    '{{content}}': content,
+    '{{date}}': dateStr,
+    '{{time}}': timeStr,
+    '{{year}}': year.toString(),
+    '{{month}}': month,
+    '{{day}}': day,
+    '{{hour}}': hour,
+    '{{minute}}': minute,
+    '{{second}}': second,
+  };
+
+  let result = template;
+  for (const [key, value] of Object.entries(replacements)) {
+    // Replace all occurrences
+    result = result.split(key).join(value);
+  }
+  return result;
+};
+
 // --- Main Application ---
 
 const App = () => {
@@ -243,6 +271,7 @@ const App = () => {
     const saved = localStorage.getItem("obsidian_folder");
     return saved !== null ? saved : ""; 
   });
+  const [fileNameTemplate, setFileNameTemplate] = useState(() => localStorage.getItem("obsidian_filename") || "{{date}} {{time}} Idea");
   const [template, setTemplate] = useState(() => localStorage.getItem("obsidian_template") || "{{content}}");
 
   // Refs
@@ -251,7 +280,7 @@ const App = () => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recordingMimeTypeRef = useRef<string>("");
 
-  // Initialize
+  // Initialize Content
   useEffect(() => {
     // Restore unsaved content
     const savedContent = localStorage.getItem("unsaved_idea");
@@ -263,13 +292,13 @@ const App = () => {
     localStorage.setItem("unsaved_idea", content);
   }, [content]);
 
-  // Save Settings
-  const saveSettings = () => {
+  // Auto-save Settings
+  useEffect(() => {
     localStorage.setItem("obsidian_vault", vaultName);
     localStorage.setItem("obsidian_folder", folderPath);
+    localStorage.setItem("obsidian_filename", fileNameTemplate);
     localStorage.setItem("obsidian_template", template);
-    setShowSettings(false);
-  };
+  }, [vaultName, folderPath, fileNameTemplate, template]);
 
   // --- Core Functions ---
 
@@ -388,20 +417,6 @@ const App = () => {
     }
   };
 
-  const applyTemplate = (rawContent: string) => {
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0];
-    const timeStr = now.toTimeString().slice(0, 5); // HH:MM
-
-    // Default to just content if template is somehow empty
-    let tmpl = template || "{{content}}";
-    
-    return tmpl
-      .replace(/{{content}}/g, rawContent)
-      .replace(/{{date}}/g, dateStr)
-      .replace(/{{time}}/g, timeStr);
-  };
-
   const handleSendToObsidian = () => {
     if (!vaultName) {
       alert("Please configure your Obsidian Vault Name in settings first.");
@@ -413,7 +428,12 @@ const App = () => {
       return;
     }
 
-    const filename = getTimestampFilename();
+    const filenameTemplate = fileNameTemplate || "{{date}} {{time}} Idea";
+    let filename = formatWithTokens(filenameTemplate);
+    
+    // Sanitize filename: replace colons and slashes with dashes
+    filename = filename.replace(/[:\/\\?%*|"<>]/g, '-');
+
     const encodedVault = encodeURIComponent(vaultName);
     
     // Construct file path: trim slash logic to ensure clean paths
@@ -422,24 +442,20 @@ const App = () => {
     const encodedFile = encodeURIComponent(fullPath);
     
     // Apply template before encoding
-    const finalContent = applyTemplate(content);
+    const finalContent = formatWithTokens(template || "{{content}}", content);
     const encodedContent = encodeURIComponent(finalContent);
 
     // Construct Obsidian URI
     const uri = `obsidian://new?vault=${encodedVault}&file=${encodedFile}&content=${encodedContent}`;
 
-    // On iOS, a simulated click often works better for deep links
-    const link = document.createElement('a');
-    link.href = uri;
-    link.style.display = 'none';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // On iOS, changing window location is more reliable for deep links
+    // than simulating a click on a hidden element.
+    window.location.href = uri;
   };
 
   const handleShare = async () => {
     // Apply template for sharing (assuming "Export to..." use case)
-    const finalContent = applyTemplate(content);
+    const finalContent = formatWithTokens(template || "{{content}}", content);
     
     if (navigator.share) {
       try {
@@ -613,6 +629,21 @@ const App = () => {
             </div>
 
             <div style={STYLES.inputGroup}>
+              <label style={STYLES.label}>File Name Template</label>
+              <input 
+                style={STYLES.input} 
+                value={fileNameTemplate}
+                onChange={(e) => setFileNameTemplate(e.target.value)}
+                placeholder="{{date}} {{time}} Idea"
+              />
+               <div style={{fontSize: '0.8rem', color: COLORS.textMuted, marginTop: '4px', display:'flex', gap: '4px', flexWrap: 'wrap', lineHeight: '1.4'}}>
+                <Info size={12} style={{marginTop: 2}}/>
+                {`{{date}}`}, {`{{time}}`}, {`{{year}}`}, {`{{month}}`}, {`{{day}}`}, {`{{hour}}`}, {`{{minute}}`}, {`{{second}}`}.
+                Colons in time will be replaced by dashes in filenames.
+              </div>
+            </div>
+
+            <div style={STYLES.inputGroup}>
               <label style={STYLES.label}>Note Template</label>
               <textarea 
                 style={STYLES.settingsTextarea} 
@@ -622,7 +653,6 @@ const App = () => {
               />
                <div style={{fontSize: '0.8rem', color: COLORS.textMuted, marginTop: '4px', lineHeight: '1.4'}}>
                 Use <code>{`{{content}}`}</code> for your note.<br/>
-                Use <code>{`{{date}}`}</code> and <code>{`{{time}}`}</code> for timestamps.<br/>
                 Example:<br/>
                 <pre style={{background: '#333', padding: '4px', borderRadius: '4px', margin: '4px 0'}}>
 ---
@@ -635,10 +665,10 @@ created: {`{{date}}`} {`{{time}}`}
 
             <button 
               style={{...STYLES.button, ...STYLES.primaryBtn, width: '100%', marginTop: '16px'}} 
-              onClick={saveSettings}
+              onClick={() => setShowSettings(false)}
             >
-              <Save size={18} />
-              Save Settings
+              <Check size={18} />
+              Done
             </button>
           </div>
         </div>
