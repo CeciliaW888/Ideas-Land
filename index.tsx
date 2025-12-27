@@ -160,17 +160,22 @@ const App = () => {
         model: 'gemini-2.0-flash-exp',
         contents: `You are an expert personal knowledge management assistant. 
         Refine the following raw note into a clean, concise Markdown format.
-        - Fix grammar and spelling.
-        - If it looks like a task, format it as a checklist item.
-        - Add a relevant #tag at the end based on the context.
-        - Keep the tone personal.
+
+        STRICT RULES:
+        1. DO NOT include any introductory phrases like "Here is your note" or "Okay, I've cleaned it up".
+        2. DO NOT include any meta-commentary or conversational filler.
+        3. OUTPUT ONLY the refined note content itself.
+        4. Fix grammar and spelling.
+        5. If it looks like a task, format it as a checklist item.
+        6. Add a relevant #tag at the end based on the context.
+        7. Keep the tone personal.
         
         Raw Note:
         ${content}`,
       });
 
       if (response.text) {
-        setContent(response.text);
+        setContent(response.text.trim());
         showToast("Note polished!", 'success');
       }
     } catch (error) {
