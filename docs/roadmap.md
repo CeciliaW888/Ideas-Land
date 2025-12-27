@@ -12,6 +12,7 @@ To build a lightweight, mobile-first Progressive Web Application (PWA) that acts
 - [x] **"Magic Polish"**: AI processing to fix grammar, format as Markdown, and auto-tag notes.
 - [x] **Draft Persistence**: Auto-saves current text to `localStorage` to prevent data loss on refresh.
 - [x] **Quick Clear**: One-tap button to clear the editor contents.
+- [x] **Error Handling**: Implemented non-blocking Toast notifications for API errors, permissions, and feedback.
 
 ### Integrations & Export
 - [x] **Obsidian Deep Links**: Generates `obsidian://new` URIs to create notes directly in a local Obsidian vault.
@@ -25,10 +26,9 @@ To build a lightweight, mobile-first Progressive Web Application (PWA) that acts
 - [x] **Templating System**: Support for `{{content}}`, `{{date}}`, and `{{time}}` placeholders.
 
 ## 🚧 In Progress / Refinements
-- [ ] **Error Handling**: Better UI feedback for API limits or network failures.
+- [ ] **History/Archive**: Store the last 10 notes locally in case an export fails or is forgotten.
 
 ## 🔮 Future Ideas
-- **History/Archive**: Store the last 10 notes locally in case an export fails or is forgotten.
 - **Image Support**: Allow uploading or taking a picture to add context to the note (Gemini Multimodal).
 - **Auto-Tagging Configuration**: Allow users to define a specific set of tags for the AI to choose from.
 - **Append Mode**: Option to append to an existing "Daily Note" instead of creating a new file for every idea.

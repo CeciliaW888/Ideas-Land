@@ -185,4 +185,36 @@ export const STYLES = {
     gap: "6px",
     animation: "pulse 1.5s infinite",
   },
+  toast: {
+    position: "absolute" as const,
+    top: "80px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    padding: "10px 20px",
+    borderRadius: "12px",
+    fontSize: "0.9rem",
+    fontWeight: "500",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.5)",
+    zIndex: 1000,
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    maxWidth: "90%",
+    width: "max-content",
+    animation: "fadeIn 0.2s ease-out",
+    backdropFilter: "blur(8px)",
+    color: "#fff",
+  },
+  toastError: {
+    backgroundColor: "rgba(239, 68, 68, 0.9)", // COLORS.danger with opacity
+    border: `1px solid ${COLORS.danger}`,
+  },
+  toastSuccess: {
+    backgroundColor: "rgba(34, 197, 94, 0.9)", // COLORS.success
+    border: `1px solid ${COLORS.success}`,
+  },
+  toastInfo: {
+    backgroundColor: "rgba(30, 30, 30, 0.9)", // COLORS.card
+    border: `1px solid ${COLORS.border}`,
+  },
 };

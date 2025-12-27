@@ -6,6 +6,7 @@ import { Header } from "./components/Header";
 import { Editor } from "./components/Editor";
 import { Toolbar } from "./components/Toolbar";
 import { SettingsModal } from "./components/SettingsModal";
+import { Toast, ToastType } from "./components/Toast";
 import { STYLES, COLORS } from "./utils/styles";
 import { blobToBase64, getSupportedMimeType, formatWithTokens } from "./utils/helpers";
 
@@ -18,6 +19,9 @@ const App = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
+  
+  // Toast State
+  const [toast, setToast] = useState<{message: string, type: ToastType} | null>(null);
   
   // Settings - Initialize from LocalStorage or Defaults
   const [vaultName, setVaultName] = useState(() => localStorage.getItem("obsidian_vault") || "");
@@ -57,6 +61,10 @@ const App = () => {
 
   // --- Core Functions ---
 
+  const showToast = (message: string, type: ToastType = 'info') => {
+    setToast({ message, type });
+  };
+
   const handleRecordToggle = async () => {
     if (isRecording) {
       // Stop Recording
@@ -67,7 +75,7 @@ const App = () => {
       // Start Recording
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-           throw new Error("Microphone access is not supported in this browser environment.");
+           throw new Error("Microphone access is not supported in this browser.");
         }
 
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -103,7 +111,7 @@ const App = () => {
         setIsRecording(true);
       } catch (err) {
         console.error("Error accessing microphone:", err);
-        alert("Could not access microphone. " + (err instanceof Error ? err.message : ""));
+        showToast("Could not access microphone.", 'error');
         setIsProcessing(false);
       }
     }
@@ -133,9 +141,10 @@ const App = () => {
 
       const transcription = response.text || "";
       setContent((prev) => prev + (prev ? "\n\n" : "") + transcription);
+      showToast("Transcription complete", 'success');
     } catch (error) {
       console.error("Transcription failed", error);
-      alert("Transcription failed. Please try again. " + (error instanceof Error ? error.message : ""));
+      showToast("Transcription failed. Please try again.", 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -161,10 +170,11 @@ const App = () => {
 
       if (response.text) {
         setContent(response.text);
+        showToast("Note polished!", 'success');
       }
     } catch (error) {
       console.error("Polish failed", error);
-      alert("Could not polish text. " + (error instanceof Error ? error.message : ""));
+      showToast("Could not polish text. Check connection.", 'error');
     } finally {
       setIsProcessing(false);
     }
@@ -172,12 +182,12 @@ const App = () => {
 
   const handleSendToObsidian = () => {
     if (!vaultName) {
-      alert("Please configure your Obsidian Vault Name in settings first.");
+      showToast("Vault name is missing. Please configure settings.", 'error');
       setShowSettings(true);
       return;
     }
     if (!content.trim()) {
-      alert("Write something first!");
+      showToast("Write something first!", 'info');
       return;
     }
 
@@ -203,11 +213,15 @@ const App = () => {
     const uri = `obsidian://new?vault=${encodedVault}&file=${encodedFile}&content=${encodedContent}`;
 
     window.location.href = uri;
+    showToast("Opening Obsidian...", 'info');
   };
 
   const handleClear = () => {
-    if (content.trim() && window.confirm("Clear all content?")) {
-      setContent("");
+    if (content.trim()) {
+      // We keep the confirm dialog as it is a destructive action
+      if (window.confirm("Clear all content?")) {
+        setContent("");
+      }
     }
   };
 
@@ -216,8 +230,10 @@ const App = () => {
       await navigator.clipboard.writeText(content);
       setCopyFeedback(true);
       setTimeout(() => setCopyFeedback(false), 2000);
+      showToast("Copied to clipboard", 'success');
     } catch (err) {
       console.error('Failed to copy', err);
+      showToast("Failed to copy", 'error');
     }
   };
 
@@ -232,10 +248,19 @@ const App = () => {
     setFileNameTemplate(newSettings.fileNameTemplate);
     setTemplate(newSettings.template);
     setShowSettings(false);
+    showToast("Settings saved", 'success');
   };
 
   return (
     <div style={STYLES.container}>
+      {toast && (
+        <Toast 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={() => setToast(null)} 
+        />
+      )}
+
       <Header 
         onCopy={handleCopy} 
         onOpenSettings={() => setShowSettings(true)} 
@@ -280,12 +305,16 @@ const App = () => {
           50% { opacity: 0.5; }
           100% { opacity: 1; }
         }
-        .animate-spin {
-          animation: spin 1s linear infinite;
-        }
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translate(-50%, -10px); }
+          to { opacity: 1; transform: translate(-50%, 0); }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
         }
       `}</style>
     </div>
