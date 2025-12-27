@@ -26,7 +26,7 @@ The application is designed to be ephemeral. It holds data only long enough to c
     - `obsidian_vault`, `obsidian_folder`, `obsidian_template`: Stores user configuration.
 - **Export Mechanism**:
     - **Obsidian URI Scheme**: We use the `obsidian://` protocol. This allows the web app to interact with the locally installed Obsidian app on iOS/Android/Desktop without requiring file system access permissions.
-    - **Web Share API**: Uses `navigator.share` to tap into the OS-level sharing capabilities.
+    - **Clipboard API**: Standard `navigator.clipboard` access.
 
 ## Key Architectural Decisions
 

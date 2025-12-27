@@ -11,11 +11,12 @@ To build a lightweight, mobile-first Progressive Web Application (PWA) that acts
 - [x] **AI Transcription**: Uses Google Gemini 2.0 Flash to transcribe audio to text with high accuracy.
 - [x] **"Magic Polish"**: AI processing to fix grammar, format as Markdown, and auto-tag notes.
 - [x] **Draft Persistence**: Auto-saves current text to `localStorage` to prevent data loss on refresh.
+- [x] **Quick Clear**: One-tap button to clear the editor contents.
 
 ### Integrations & Export
 - [x] **Obsidian Deep Links**: Generates `obsidian://new` URIs to create notes directly in a local Obsidian vault.
-- [x] **Native Share Sheet**: Uses the Web Share API for native mobile sharing integration.
 - [x] **Clipboard Copy**: Fallback button to copy text for manual pasting.
+- [x] **PWA Manifest**: Configured `manifest.json` for "Add to Home Screen" capability and standalone display.
 
 ### Customization
 - [x] **Vault Configuration**: Setting to define the target Obsidian Vault name.
@@ -23,7 +24,7 @@ To build a lightweight, mobile-first Progressive Web Application (PWA) that acts
 - [x] **Templating System**: Support for `{{content}}`, `{{date}}`, and `{{time}}` placeholders.
 
 ## 🚧 In Progress / Refinements
-- [ ] **PWA Manifest**: Adding `manifest.json` and service workers to allow "Add to Home Screen" and offline caching of the app shell.
+- [ ] **Service Workers**: Enable offline caching of the app shell (currently relies on browser cache).
 - [ ] **Error Handling**: Better UI feedback for API limits or network failures.
 
 ## 🔮 Future Ideas

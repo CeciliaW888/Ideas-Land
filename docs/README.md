@@ -44,7 +44,7 @@ Tap the **Sparkles (Polish)** button.
 *   The AI will rewrite your rough note into clean Markdown.
 *   It fixes spelling, formatting, and may add relevant tags.
 
-### 3. Saving & Sharing
+### 3. Saving & Actions
 *   **Obsidian Button**: Opens the Obsidian app and creates a new file based on your settings.
-*   **Share Button**: Opens the native iOS/Android share sheet (Send to WhatsApp, Reminders, Apple Notes, etc.).
+*   **Clear Button**: Tap the **Eraser** icon to wipe all text from the editor (requires confirmation).
 *   **Copy Button**: Copies the *raw* text (ignoring the template) to your clipboard.
