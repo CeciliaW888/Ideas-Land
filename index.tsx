@@ -18,6 +18,7 @@ const App = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
   
   // Toast State
@@ -218,11 +219,14 @@ const App = () => {
 
   const handleClear = () => {
     if (content.trim()) {
-      // We keep the confirm dialog as it is a destructive action
-      if (window.confirm("Clear all content?")) {
-        setContent("");
-      }
+      setShowClearConfirm(true);
     }
+  };
+
+  const confirmClear = () => {
+    setContent("");
+    setShowClearConfirm(false);
+    showToast("Content cleared", 'info');
   };
 
   const handleCopy = async () => {
@@ -263,8 +267,8 @@ const App = () => {
 
       <Header 
         onCopy={handleCopy} 
+        copyFeedback={copyFeedback}
         onOpenSettings={() => setShowSettings(true)} 
-        copyFeedback={copyFeedback} 
       />
 
       <Editor 
@@ -296,6 +300,31 @@ const App = () => {
             template
           }}
         />
+      )}
+
+      {showClearConfirm && (
+        <div style={STYLES.modalOverlay}>
+          <div style={STYLES.modal}>
+            <h2 style={{marginTop: 0, fontSize: '1.25rem'}}>Clear Content?</h2>
+            <p style={{color: COLORS.textMuted, lineHeight: 1.5, marginBottom: '24px'}}>
+              This will permanently delete your current note. This action cannot be undone.
+            </p>
+            <div style={{display: 'flex', gap: '12px'}}>
+              <button 
+                style={{...STYLES.button, ...STYLES.secondaryBtn}} 
+                onClick={() => setShowClearConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                style={{...STYLES.button, backgroundColor: COLORS.danger, color: 'white', border: 'none', flex: 1}} 
+                onClick={confirmClear}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       
       {/* Global Styles for Animations */}
