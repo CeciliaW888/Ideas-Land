@@ -17,6 +17,7 @@ To build a lightweight, mobile-first Progressive Web Application (PWA) that acts
 - [x] **Obsidian Deep Links**: Generates `obsidian://new` URIs to create notes directly in a local Obsidian vault.
 - [x] **Clipboard Copy**: Fallback button to copy text for manual pasting.
 - [x] **PWA Manifest**: Configured `manifest.json` for "Add to Home Screen" capability and standalone display.
+- [x] **Service Workers**: Enabled offline caching of app shell and assets for instant loading.
 
 ### Customization
 - [x] **Vault Configuration**: Setting to define the target Obsidian Vault name.
@@ -24,7 +25,6 @@ To build a lightweight, mobile-first Progressive Web Application (PWA) that acts
 - [x] **Templating System**: Support for `{{content}}`, `{{date}}`, and `{{time}}` placeholders.
 
 ## 🚧 In Progress / Refinements
-- [ ] **Service Workers**: Enable offline caching of the app shell (currently relies on browser cache).
 - [ ] **Error Handling**: Better UI feedback for API limits or network failures.
 
 ## 🔮 Future Ideas
