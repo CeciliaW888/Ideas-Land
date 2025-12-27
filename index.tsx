@@ -1,259 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { GoogleGenAI, Modality } from "@google/genai";
-import { Mic, Send, Sparkles, Settings, Save, X, Info, Loader2, Share2, Copy, Check } from "lucide-react";
+import { GoogleGenAI } from "@google/genai";
 
-// --- Constants & Styles ---
-
-const COLORS = {
-  bg: "#111111",
-  card: "#1e1e1e",
-  text: "#e5e5e5",
-  textMuted: "#a3a3a3",
-  primary: "#7c3aed", // Obsidian Purple-ish
-  primaryHover: "#6d28d9",
-  danger: "#ef4444",
-  border: "#333333",
-  success: "#22c55e",
-};
-
-const STYLES = {
-  container: {
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-    backgroundColor: COLORS.bg,
-    color: COLORS.text,
-    minHeight: "100vh",
-    display: "flex",
-    flexDirection: "column" as const,
-    padding: "0",
-    overflow: "hidden",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "16px 20px",
-    borderBottom: `1px solid ${COLORS.border}`,
-    backgroundColor: COLORS.card,
-  },
-  title: {
-    fontSize: "1.25rem",
-    fontWeight: "700",
-    margin: 0,
-    background: "linear-gradient(to right, #c084fc, #7c3aed)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-  },
-  editorArea: {
-    flex: 1,
-    display: "flex",
-    flexDirection: "column" as const,
-    padding: "16px",
-    position: "relative" as const,
-  },
-  textarea: {
-    width: "100%",
-    flex: 1,
-    backgroundColor: "transparent",
-    border: "none",
-    color: COLORS.text,
-    fontSize: "1.1rem",
-    lineHeight: "1.6",
-    resize: "none" as const,
-    outline: "none",
-    fontFamily: "inherit",
-  },
-  toolbar: {
-    padding: "12px 16px 24px 16px",
-    backgroundColor: COLORS.card,
-    borderTop: `1px solid ${COLORS.border}`,
-    display: "flex",
-    gap: "10px",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  button: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "8px",
-    padding: "12px 16px",
-    borderRadius: "12px",
-    border: "none",
-    fontSize: "1rem",
-    fontWeight: "600",
-    cursor: "pointer",
-    transition: "transform 0.1s ease, opacity 0.2s",
-  },
-  actionBtn: {
-    backgroundColor: COLORS.card,
-    color: COLORS.text,
-    border: `1px solid ${COLORS.border}`,
-  },
-  primaryBtn: {
-    backgroundColor: COLORS.primary,
-    color: "#fff",
-    flex: 2, // Make Send button larger
-  },
-  secondaryBtn: {
-     backgroundColor: COLORS.card,
-     color: COLORS.text,
-     border: `1px solid ${COLORS.border}`,
-     flex: 1,
-  },
-  iconBtn: {
-    background: "transparent",
-    border: "none",
-    color: COLORS.text,
-    cursor: "pointer",
-    padding: "8px",
-  },
-  modalOverlay: {
-    position: "fixed" as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 50,
-    backdropFilter: "blur(4px)",
-  },
-  modal: {
-    backgroundColor: COLORS.card,
-    borderRadius: "16px",
-    padding: "24px",
-    width: "90%",
-    maxWidth: "400px",
-    maxHeight: "85vh",
-    overflowY: "auto" as const,
-    border: `1px solid ${COLORS.border}`,
-    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)",
-  },
-  inputGroup: {
-    marginBottom: "16px",
-  },
-  label: {
-    display: "block",
-    marginBottom: "8px",
-    fontSize: "0.9rem",
-    color: COLORS.textMuted,
-  },
-  input: {
-    width: "100%",
-    padding: "12px",
-    borderRadius: "8px",
-    backgroundColor: COLORS.bg,
-    border: `1px solid ${COLORS.border}`,
-    color: COLORS.text,
-    fontSize: "1rem",
-    outline: "none",
-    boxSizing: "border-box" as const,
-  },
-  settingsTextarea: {
-    width: "100%",
-    padding: "12px",
-    borderRadius: "8px",
-    backgroundColor: COLORS.bg,
-    border: `1px solid ${COLORS.border}`,
-    color: COLORS.text,
-    fontSize: "0.9rem",
-    fontFamily: "monospace",
-    minHeight: "100px",
-    resize: "vertical" as const,
-    outline: "none",
-    boxSizing: "border-box" as const,
-  },
-  recordingIndicator: {
-    position: "absolute" as const,
-    top: "20px",
-    right: "20px",
-    backgroundColor: COLORS.danger,
-    color: "white",
-    padding: "6px 12px",
-    borderRadius: "20px",
-    fontSize: "0.8rem",
-    fontWeight: "bold",
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    animation: "pulse 1.5s infinite",
-  },
-};
-
-// --- Helpers ---
-
-const blobToBase64 = (blob: Blob): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === 'string') {
-        const base64 = reader.result.split(',')[1];
-        resolve(base64);
-      } else {
-        reject(new Error("Failed to read blob"));
-      }
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-};
-
-const getSupportedMimeType = () => {
-  if (typeof MediaRecorder === "undefined") return undefined;
-  
-  // Prioritize webm (Chrome/Desktop), then mp4 (iOS/Safari), then others
-  const types = [
-    "audio/webm;codecs=opus",
-    "audio/webm",
-    "audio/mp4",
-    "audio/aac",
-    "audio/ogg"
-  ];
-  
-  for (const type of types) {
-    if (MediaRecorder.isTypeSupported(type)) {
-      return type;
-    }
-  }
-  return undefined; // Let the browser decide default
-};
-
-const formatWithTokens = (template: string, content: string = ""): string => {
-  const now = new Date();
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  
-  const year = now.getFullYear();
-  const month = pad(now.getMonth() + 1);
-  const day = pad(now.getDate());
-  const hour = pad(now.getHours());
-  const minute = pad(now.getMinutes());
-  const second = pad(now.getSeconds());
-
-  const dateStr = `${year}-${month}-${day}`;
-  const timeStr = `${hour}:${minute}`; // Standard time format
-
-  const replacements: Record<string, string> = {
-    '{{content}}': content,
-    '{{date}}': dateStr,
-    '{{time}}': timeStr,
-    '{{year}}': year.toString(),
-    '{{month}}': month,
-    '{{day}}': day,
-    '{{hour}}': hour,
-    '{{minute}}': minute,
-    '{{second}}': second,
-  };
-
-  let result = template;
-  for (const [key, value] of Object.entries(replacements)) {
-    // Replace all occurrences
-    result = result.split(key).join(value);
-  }
-  return result;
-};
+import { Header } from "./components/Header";
+import { Editor } from "./components/Editor";
+import { Toolbar } from "./components/Toolbar";
+import { SettingsModal } from "./components/SettingsModal";
+import { STYLES, COLORS } from "./utils/styles";
+import { blobToBase64, getSupportedMimeType, formatWithTokens } from "./utils/helpers";
 
 // --- Main Application ---
 
@@ -265,7 +19,7 @@ const App = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
   
-  // Settings
+  // Settings - Initialize from LocalStorage or Defaults
   const [vaultName, setVaultName] = useState(() => localStorage.getItem("obsidian_vault") || "");
   const [folderPath, setFolderPath] = useState(() => {
     const saved = localStorage.getItem("obsidian_folder");
@@ -293,6 +47,7 @@ const App = () => {
   }, [content]);
 
   // Auto-save Settings
+  // This runs whenever settings state changes (e.g., after closing settings modal with new values)
   useEffect(() => {
     localStorage.setItem("obsidian_vault", vaultName);
     localStorage.setItem("obsidian_folder", folderPath);
@@ -434,7 +189,8 @@ const App = () => {
     // Sanitize filename: replace colons and slashes with dashes
     filename = filename.replace(/[:\/\\?%*|"<>]/g, '-');
 
-    const encodedVault = encodeURIComponent(vaultName);
+    // Trim vault name to ensure no trailing spaces cause "Vault Not Found" errors
+    const encodedVault = encodeURIComponent(vaultName.trim());
     
     // Construct file path: trim slash logic to ensure clean paths
     const cleanFolder = folderPath.trim().replace(/\/$/, ""); 
@@ -473,9 +229,6 @@ const App = () => {
   };
 
   const handleCopy = async () => {
-    // For copy, we usually want the raw text to paste anywhere, 
-    // but if the user relies on templates for everything, this is debatable.
-    // For now, let's keep Copy as "Raw Content" for quick extraction.
     try {
       await navigator.clipboard.writeText(content);
       setCopyFeedback(true);
@@ -485,193 +238,59 @@ const App = () => {
     }
   };
 
+  const handleSaveSettings = (newSettings: {
+    vaultName: string;
+    folderPath: string;
+    fileNameTemplate: string;
+    template: string;
+  }) => {
+    setVaultName(newSettings.vaultName);
+    setFolderPath(newSettings.folderPath);
+    setFileNameTemplate(newSettings.fileNameTemplate);
+    setTemplate(newSettings.template);
+    setShowSettings(false);
+  };
+
   const canShare = typeof navigator !== 'undefined' && !!navigator.share;
 
   return (
     <div style={STYLES.container}>
-      {/* Header */}
-      <header style={STYLES.header}>
-        <div style={{display:'flex', alignItems:'center', gap: '8px'}}>
-          <Sparkles size={20} color={COLORS.primary} />
-          <h1 style={STYLES.title}>Idea Land</h1>
-        </div>
-        <div style={{display:'flex', gap:'4px'}}>
-            <button style={STYLES.iconBtn} onClick={handleCopy}>
-                {copyFeedback ? <Check size={20} color={COLORS.success} /> : <Copy size={20} />}
-            </button>
-            <button style={STYLES.iconBtn} onClick={() => setShowSettings(true)}>
-            <Settings size={20} />
-            </button>
-        </div>
-      </header>
+      <Header 
+        onCopy={handleCopy} 
+        onOpenSettings={() => setShowSettings(true)} 
+        copyFeedback={copyFeedback} 
+      />
 
-      {/* Main Editor */}
-      <div style={STYLES.editorArea}>
-        <textarea
-          ref={textareaRef}
-          style={STYLES.textarea}
-          placeholder="Jot down a fleeting thought..."
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          autoFocus
-        />
-        
-        {isRecording && (
-          <div style={STYLES.recordingIndicator}>
-            <div style={{width: 8, height: 8, background: 'white', borderRadius: '50%'}} />
-            Recording...
-          </div>
-        )}
+      <Editor 
+        content={content}
+        setContent={setContent}
+        isRecording={isRecording}
+        isProcessing={isProcessing}
+        textareaRef={textareaRef}
+      />
 
-        {isProcessing && (
-          <div style={{
-            position: 'absolute', 
-            bottom: 20, 
-            left: '50%', 
-            transform: 'translateX(-50%)',
-            background: COLORS.card,
-            padding: '8px 16px',
-            borderRadius: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
-            fontSize: '0.9rem'
-          }}>
-            <Loader2 className="animate-spin" size={16} />
-            Thinking...
-          </div>
-        )}
-      </div>
+      <Toolbar 
+        isRecording={isRecording}
+        isProcessing={isProcessing}
+        content={content}
+        canShare={canShare}
+        onRecordToggle={handleRecordToggle}
+        onMagicPolish={handleMagicPolish}
+        onShare={handleShare}
+        onSendToObsidian={handleSendToObsidian}
+      />
 
-      {/* Toolbar */}
-      <div style={STYLES.toolbar}>
-        <button 
-          style={{...STYLES.button, ...STYLES.actionBtn, flex: 0, minWidth: '50px'}}
-          onClick={handleRecordToggle}
-          disabled={isProcessing}
-        >
-          {isRecording ? <div style={{width: 16, height: 16, background: COLORS.danger, borderRadius: 2}} /> : <Mic size={20} />}
-        </button>
-
-        {!isRecording && (
-          <>
-             <button 
-              style={{...STYLES.button, ...STYLES.secondaryBtn, flex: 1}}
-              onClick={handleMagicPolish}
-              disabled={isProcessing || !content.trim()}
-            >
-              <Sparkles size={18} color={COLORS.primary} />
-              Polish
-            </button>
-
-            {canShare ? (
-                <button 
-                style={{...STYLES.button, ...STYLES.secondaryBtn, flex: 0, padding: '12px'}}
-                onClick={handleShare}
-                disabled={isProcessing || !content.trim()}
-                title="Share"
-                >
-                <Share2 size={18} />
-                </button>
-            ) : null}
-
-            <button 
-              style={{...STYLES.button, ...STYLES.primaryBtn}}
-              onClick={handleSendToObsidian}
-              disabled={isProcessing}
-              title="Save to Obsidian Vault"
-            >
-              <Send size={18} />
-              Obsidian
-            </button>
-          </>
-        )}
-      </div>
-
-      {/* Settings Modal */}
       {showSettings && (
-        <div style={STYLES.modalOverlay}>
-          <div style={STYLES.modal}>
-            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: '20px'}}>
-              <h2 style={{margin: 0, fontSize: '1.2rem'}}>Settings</h2>
-              <button style={STYLES.iconBtn} onClick={() => setShowSettings(false)}>
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div style={STYLES.inputGroup}>
-              <label style={STYLES.label}>Obsidian Vault Name (Required)</label>
-              <input 
-                style={STYLES.input} 
-                value={vaultName}
-                onChange={(e) => setVaultName(e.target.value)}
-                placeholder="e.g., MyKnowledgeBase"
-              />
-              <div style={{fontSize: '0.8rem', color: COLORS.textMuted, marginTop: '4px', display:'flex', gap: '4px'}}>
-                <Info size={12} style={{marginTop: 2}}/>
-                Required for direct "Obsidian" button. Case-sensitive.
-              </div>
-            </div>
-
-            <div style={STYLES.inputGroup}>
-              <label style={STYLES.label}>Inbox Folder Path (Optional)</label>
-              <input 
-                style={STYLES.input} 
-                value={folderPath}
-                onChange={(e) => setFolderPath(e.target.value)}
-                placeholder="e.g., Inbox (Leave empty for root)"
-              />
-               <div style={{fontSize: '0.8rem', color: COLORS.textMuted, marginTop: '4px', display:'flex', gap: '4px'}}>
-                <Info size={12} style={{marginTop: 2}}/>
-                Leave blank to save to the root of your vault.
-              </div>
-            </div>
-
-            <div style={STYLES.inputGroup}>
-              <label style={STYLES.label}>File Name Template</label>
-              <input 
-                style={STYLES.input} 
-                value={fileNameTemplate}
-                onChange={(e) => setFileNameTemplate(e.target.value)}
-                placeholder="{{date}} {{time}} Idea"
-              />
-               <div style={{fontSize: '0.8rem', color: COLORS.textMuted, marginTop: '4px', display:'flex', gap: '4px', flexWrap: 'wrap', lineHeight: '1.4'}}>
-                <Info size={12} style={{marginTop: 2}}/>
-                {`{{date}}`}, {`{{time}}`}, {`{{year}}`}, {`{{month}}`}, {`{{day}}`}, {`{{hour}}`}, {`{{minute}}`}, {`{{second}}`}.
-                Colons in time will be replaced by dashes in filenames.
-              </div>
-            </div>
-
-            <div style={STYLES.inputGroup}>
-              <label style={STYLES.label}>Note Template</label>
-              <textarea 
-                style={STYLES.settingsTextarea} 
-                value={template}
-                onChange={(e) => setTemplate(e.target.value)}
-                placeholder="Type your template here..."
-              />
-               <div style={{fontSize: '0.8rem', color: COLORS.textMuted, marginTop: '4px', lineHeight: '1.4'}}>
-                Use <code>{`{{content}}`}</code> for your note.<br/>
-                Example:<br/>
-                <pre style={{background: '#333', padding: '4px', borderRadius: '4px', margin: '4px 0'}}>
----
-created: {`{{date}}`} {`{{time}}`}
----
-{`{{content}}`}
-                </pre>
-              </div>
-            </div>
-
-            <button 
-              style={{...STYLES.button, ...STYLES.primaryBtn, width: '100%', marginTop: '16px'}} 
-              onClick={() => setShowSettings(false)}
-            >
-              <Check size={18} />
-              Done
-            </button>
-          </div>
-        </div>
+        <SettingsModal 
+          onClose={() => setShowSettings(false)}
+          onSave={handleSaveSettings}
+          currentSettings={{
+            vaultName,
+            folderPath,
+            fileNameTemplate,
+            template
+          }}
+        />
       )}
       
       {/* Global Styles for Animations */}
