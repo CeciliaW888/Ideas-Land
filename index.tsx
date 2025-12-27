@@ -91,8 +91,6 @@ const App = () => {
 
         mediaRecorder.onstop = async () => {
           // Determine the actual mime type used
-          // Some browsers populates mediaRecorder.mimeType, others don't.
-          // Fallback to what we detected or a safe default for iOS (mp4) or Chrome (webm).
           const finalMimeType = mediaRecorder.mimeType || recordingMimeTypeRef.current || "audio/mp4";
           
           const audioBlob = new Blob(audioChunksRef.current, { type: finalMimeType });
@@ -204,27 +202,12 @@ const App = () => {
     // Construct Obsidian URI
     const uri = `obsidian://new?vault=${encodedVault}&file=${encodedFile}&content=${encodedContent}`;
 
-    // On iOS, changing window location is more reliable for deep links
-    // than simulating a click on a hidden element.
     window.location.href = uri;
   };
 
-  const handleShare = async () => {
-    // Apply template for sharing (assuming "Export to..." use case)
-    const finalContent = formatWithTokens(template || "{{content}}", content);
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Idea from Idea Land',
-          text: finalContent,
-        });
-      } catch (err) {
-        console.log('Share canceled or failed', err);
-      }
-    } else {
-      // Fallback to copying raw content if share not supported (unlikely on modern mobile)
-      handleCopy();
+  const handleClear = () => {
+    if (content.trim() && window.confirm("Clear all content?")) {
+      setContent("");
     }
   };
 
@@ -251,8 +234,6 @@ const App = () => {
     setShowSettings(false);
   };
 
-  const canShare = typeof navigator !== 'undefined' && !!navigator.share;
-
   return (
     <div style={STYLES.container}>
       <Header 
@@ -273,10 +254,9 @@ const App = () => {
         isRecording={isRecording}
         isProcessing={isProcessing}
         content={content}
-        canShare={canShare}
         onRecordToggle={handleRecordToggle}
         onMagicPolish={handleMagicPolish}
-        onShare={handleShare}
+        onClear={handleClear}
         onSendToObsidian={handleSendToObsidian}
       />
 

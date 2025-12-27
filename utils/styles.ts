@@ -15,13 +15,15 @@ export const STYLES = {
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
     backgroundColor: COLORS.bg,
     color: COLORS.text,
-    height: "100dvh", // Use dynamic viewport height
+    height: "100%", // Changed from 100dvh to 100% to reliably fit within the fixed body
     width: "100%",
     display: "flex",
     flexDirection: "column" as const,
     padding: "0",
     overflow: "hidden",
     boxSizing: "border-box" as const,
+    position: "absolute" as const, // Ensure it fills the relative root
+    inset: 0,
   },
   header: {
     display: "flex",
@@ -30,6 +32,7 @@ export const STYLES = {
     padding: "max(16px, env(safe-area-inset-top)) 20px 16px 20px",
     borderBottom: `1px solid ${COLORS.border}`,
     backgroundColor: COLORS.card,
+    flexShrink: 0, // Prevent header from shrinking
   },
   title: {
     fontSize: "1.25rem",
@@ -46,6 +49,7 @@ export const STYLES = {
     padding: "16px",
     position: "relative" as const,
     overflow: "hidden",
+    minHeight: 0, // Critical: allows flex child to shrink below content size
   },
   textarea: {
     width: "100%",
@@ -69,6 +73,8 @@ export const STYLES = {
     justifyContent: "space-between",
     alignItems: "center",
     minHeight: "70px",
+    flexShrink: 0, // Prevent toolbar from shrinking
+    zIndex: 10,
   },
   button: {
     display: "flex",

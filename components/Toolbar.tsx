@@ -1,15 +1,14 @@
 import React from "react";
-import { Mic, Sparkles, Share2, Send } from "lucide-react";
+import { Mic, Sparkles, Eraser, Send } from "lucide-react";
 import { COLORS, STYLES } from "../utils/styles";
 
 interface ToolbarProps {
   isRecording: boolean;
   isProcessing: boolean;
   content: string;
-  canShare: boolean;
   onRecordToggle: () => void;
   onMagicPolish: () => void;
-  onShare: () => void;
+  onClear: () => void;
   onSendToObsidian: () => void;
 }
 
@@ -17,10 +16,9 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   isRecording,
   isProcessing,
   content,
-  canShare,
   onRecordToggle,
   onMagicPolish,
-  onShare,
+  onClear,
   onSendToObsidian
 }) => {
   return (
@@ -44,16 +42,14 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             Polish
           </button>
 
-          {canShare ? (
-              <button 
-              style={{...STYLES.button, ...STYLES.secondaryBtn, flex: 0, padding: '12px'}}
-              onClick={onShare}
-              disabled={isProcessing || !content.trim()}
-              title="Share"
-              >
-              <Share2 size={18} />
-              </button>
-          ) : null}
+          <button 
+            style={{...STYLES.button, ...STYLES.secondaryBtn, flex: 0, padding: '12px'}}
+            onClick={onClear}
+            disabled={isProcessing || !content.trim()}
+            title="Clear Content"
+          >
+            <Eraser size={18} />
+          </button>
 
           <button 
             style={{...STYLES.button, ...STYLES.primaryBtn}}
