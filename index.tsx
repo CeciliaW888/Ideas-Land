@@ -214,20 +214,18 @@ const App = () => {
       showToast("Transcription complete (Gemini)", 'success');
     } catch (error) {
       console.error("Gemini transcription failed", error);
-      
+
       // Auto-fallback to browser if enabled
       if (useBrowserFallback) {
         showToast("Gemini failed. Trying browser fallback...", 'info');
         setIsProcessing(false);
         handleBrowserSpeechRecognition();
+        return;
       } else {
         showToast("Transcription failed. Enable browser fallback in settings?", 'error');
-        setIsProcessing(false);
       }
     } finally {
-      if (!useBrowserFallback) {
-        setIsProcessing(false);
-      }
+      setIsProcessing(false);
     }
   };
 
