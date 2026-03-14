@@ -1,7 +1,7 @@
 {
   "name": "Idea Land",
   "short_name": "Idea Land",
-  "start_url": "./index.html",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#111111",
   "theme_color": "#111111",
