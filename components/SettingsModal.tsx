@@ -7,6 +7,8 @@ interface Settings {
   folderPath: string;
   fileNameTemplate: string;
   template: string;
+  useBrowserFallback?: boolean;
+  browserLanguage?: string;
 }
 
 interface SettingsModalProps {
@@ -20,20 +22,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSave,
   currentSettings
 }) => {
-  // Initialize local state from current settings
-  // This ensures we don't apply changes until the user clicks "Save"
   const [vaultName, setVaultName] = useState(currentSettings.vaultName);
   const [folderPath, setFolderPath] = useState(currentSettings.folderPath);
   const [fileNameTemplate, setFileNameTemplate] = useState(currentSettings.fileNameTemplate);
   const [template, setTemplate] = useState(currentSettings.template);
+  const [useBrowserFallback, setUseBrowserFallback] = useState(currentSettings.useBrowserFallback ?? true);
+  const [browserLanguage, setBrowserLanguage] = useState(currentSettings.browserLanguage || 'zh-CN');
 
   const handleSave = () => {
-    // Trim inputs to avoid "Vault Not Found" errors caused by trailing spaces
     onSave({
       vaultName: vaultName.trim(),
       folderPath: folderPath.trim(),
       fileNameTemplate: fileNameTemplate.trim(),
-      template: template // Keep template as-is to preserve intentional spacing/newlines
+      template: template,
+      useBrowserFallback: useBrowserFallback,
+      browserLanguage: browserLanguage
     });
   };
 
@@ -47,6 +50,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </button>
         </div>
         
+        {/* Voice Transcription Settings */}
+        <div style={{...STYLES.inputGroup, padding: '12px', background: '#f8f9fa', borderRadius: '8px', marginBottom: '16px'}}>
+          <h3 style={{margin: '0 0 12px 0', fontSize: '1rem', fontWeight: 600}}>🎙️ Voice Transcription</h3>
+          
+          <div style={{marginBottom: '12px'}}>
+            <label style={{display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer'}}>
+              <input 
+                type="checkbox" 
+                checked={useBrowserFallback}
+                onChange={(e) => setUseBrowserFallback(e.target.checked)}
+                style={{cursor: 'pointer', width: '18px', height: '18px'}}
+              />
+              <span style={{fontWeight: 500}}>Enable browser fallback (Recommended)</span>
+            </label>
+            <div style={{fontSize: '0.8rem', color: COLORS.textMuted, marginTop: '4px', marginLeft: '26px'}}>
+              {useBrowserFallback 
+                ? "✅ Gemini first (auto-detect) → Browser fallback (free)" 
+                : "❌ Gemini only (fails if API quota exceeded)"}
+            </div>
+          </div>
+
+          <div style={STYLES.inputGroup}>
+            <label style={STYLES.label}>Browser Language (for fallback)</label>
+            <select 
+              style={{...STYLES.input, cursor: 'pointer'}}
+              value={browserLanguage}
+              onChange={(e) => setBrowserLanguage(e.target.value)}
+              disabled={!useBrowserFallback}
+            >
+              <option value="zh-CN">🇨🇳 Chinese (Simplified)</option>
+              <option value="zh-TW">🇹🇼 Chinese (Traditional)</option>
+              <option value="en-US">🇺🇸 English (US)</option>
+              <option value="en-GB">🇬🇧 English (UK)</option>
+              <option value="ja-JP">🇯🇵 Japanese</option>
+              <option value="ko-KR">🇰🇷 Korean</option>
+            </select>
+            <div style={{fontSize: '0.8rem', color: COLORS.textMuted, marginTop: '4px', display:'flex', gap: '4px'}}>
+              <Info size={12} style={{marginTop: 2}}/>
+              Used when Gemini fails or quota exceeded. Gemini auto-detects language.
+            </div>
+          </div>
+        </div>
+
         <div style={STYLES.inputGroup}>
           <label style={STYLES.label}>Obsidian Vault Name (Required)</label>
           <input 
