@@ -32,16 +32,24 @@ const App = () => {
   });
   const [fileNameTemplate, setFileNameTemplate] = useState(() => localStorage.getItem("obsidian_filename") || "{{date}} {{time}} Idea");
   const [template, setTemplate] = useState(() => localStorage.getItem("obsidian_template") || "{{content}}");
+  
+  // NEW: Transcription settings
+  const [useBrowserFallback, setUseBrowserFallback] = useState(() => 
+    localStorage.getItem("use_browser_fallback") !== "false"
+  );
+  const [browserLanguage, setBrowserLanguage] = useState(() => 
+    localStorage.getItem("browser_language") || "zh-CN"
+  );
 
   // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recordingMimeTypeRef = useRef<string>("");
+  const recognitionRef = useRef<any>(null);
 
   // Initialize Content
   useEffect(() => {
-    // Restore unsaved content
     const savedContent = localStorage.getItem("unsaved_idea");
     if (savedContent) setContent(savedContent);
   }, []);
@@ -52,13 +60,14 @@ const App = () => {
   }, [content]);
 
   // Auto-save Settings
-  // This runs whenever settings state changes (e.g., after closing settings modal with new values)
   useEffect(() => {
     localStorage.setItem("obsidian_vault", vaultName);
     localStorage.setItem("obsidian_folder", folderPath);
     localStorage.setItem("obsidian_filename", fileNameTemplate);
     localStorage.setItem("obsidian_template", template);
-  }, [vaultName, folderPath, fileNameTemplate, template]);
+    localStorage.setItem("use_browser_fallback", String(useBrowserFallback));
+    localStorage.setItem("browser_language", browserLanguage);
+  }, [vaultName, folderPath, fileNameTemplate, template, useBrowserFallback, browserLanguage]);
 
   // --- Core Functions ---
 
@@ -66,55 +75,115 @@ const App = () => {
     setToast({ message, type });
   };
 
+  // Browser Speech Recognition (Fallback)
+  const handleBrowserSpeechRecognition = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      showToast("Browser speech recognition not supported.", 'error');
+      setIsProcessing(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+    
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = browserLanguage; // User-configurable
+    
+    let finalTranscript = '';
+
+    recognition.onstart = () => {
+      setIsRecording(true);
+      showToast(`Listening (${browserLanguage})...`, 'info');
+    };
+
+    recognition.onresult = (event: any) => {
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript + ' ';
+        }
+      }
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+      if (finalTranscript.trim()) {
+        setContent((prev) => prev + (prev ? "\n\n" : "") + finalTranscript.trim());
+        showToast("Transcription complete (Browser)", 'success');
+      } else {
+        showToast("No speech detected", 'info');
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
+      setIsRecording(false);
+      if (event.error === 'no-speech') {
+        showToast("No speech detected", 'info');
+      } else {
+        showToast(`Speech error: ${event.error}`, 'error');
+      }
+    };
+
+    recognition.start();
+  };
+
+  // Gemini Audio Recording
+  const handleGeminiRecording = async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+         throw new Error("Microphone access is not supported in this browser.");
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      const supportedType = getSupportedMimeType();
+      const options = supportedType ? { mimeType: supportedType } : undefined;
+      
+      const mediaRecorder = new MediaRecorder(stream, options);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      recordingMimeTypeRef.current = supportedType || "";
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const finalMimeType = mediaRecorder.mimeType || recordingMimeTypeRef.current || "audio/mp4";
+        const audioBlob = new Blob(audioChunksRef.current, { type: finalMimeType });
+        await processAudio(audioBlob, finalMimeType);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      showToast("Recording (Gemini auto-detect)...", 'info');
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      showToast("Could not access microphone.", 'error');
+      setIsProcessing(false);
+    }
+  };
+
   const handleRecordToggle = async () => {
     if (isRecording) {
       // Stop Recording
-      mediaRecorderRef.current?.stop();
-      setIsRecording(false);
-      setIsProcessing(true);
-    } else {
-      // Start Recording
-      try {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-           throw new Error("Microphone access is not supported in this browser.");
-        }
-
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        
-        // Detect supported mime type
-        const supportedType = getSupportedMimeType();
-        const options = supportedType ? { mimeType: supportedType } : undefined;
-        
-        const mediaRecorder = new MediaRecorder(stream, options);
-        mediaRecorderRef.current = mediaRecorder;
-        audioChunksRef.current = [];
-        
-        // Store what we tried to use, or fallback
-        recordingMimeTypeRef.current = supportedType || "";
-
-        mediaRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            audioChunksRef.current.push(event.data);
-          }
-        };
-
-        mediaRecorder.onstop = async () => {
-          // Determine the actual mime type used
-          const finalMimeType = mediaRecorder.mimeType || recordingMimeTypeRef.current || "audio/mp4";
-          
-          const audioBlob = new Blob(audioChunksRef.current, { type: finalMimeType });
-          await processAudio(audioBlob, finalMimeType);
-          
-          stream.getTracks().forEach(track => track.stop()); // Stop mic
-        };
-
-        mediaRecorder.start();
-        setIsRecording(true);
-      } catch (err) {
-        console.error("Error accessing microphone:", err);
-        showToast("Could not access microphone.", 'error');
-        setIsProcessing(false);
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      } else {
+        mediaRecorderRef.current?.stop();
+        setIsProcessing(true);
       }
+      setIsRecording(false);
+    } else {
+      // Start Recording: Try Gemini first
+      await handleGeminiRecording();
     }
   };
 
@@ -134,7 +203,7 @@ const App = () => {
               }
             },
             {
-              text: "Transcribe this audio. It is a user jotting down a quick note or idea. Transcribe exactly what is said, but fix minor stutters."
+              text: "Transcribe this audio. Auto-detect language (Chinese, English, or mixed). Transcribe exactly what is said, but fix minor stutters. Do not add any commentary."
             }
           ]
         }
@@ -142,10 +211,19 @@ const App = () => {
 
       const transcription = response.text || "";
       setContent((prev) => prev + (prev ? "\n\n" : "") + transcription);
-      showToast("Transcription complete", 'success');
+      showToast("Transcription complete (Gemini)", 'success');
     } catch (error) {
-      console.error("Transcription failed", error);
-      showToast("Transcription failed. Please try again.", 'error');
+      console.error("Gemini transcription failed", error);
+
+      // Auto-fallback to browser if enabled
+      if (useBrowserFallback) {
+        showToast("Gemini failed. Trying browser fallback...", 'info');
+        setIsProcessing(false);
+        handleBrowserSpeechRecognition();
+        return;
+      } else {
+        showToast("Transcription failed. Enable browser fallback in settings?", 'error');
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -169,6 +247,7 @@ const App = () => {
         5. If it looks like a task, format it as a checklist item.
         6. Add a relevant #tag at the end based on the context.
         7. Keep the tone personal.
+        8. Preserve the original language (Chinese stays Chinese, English stays English).
         
         Raw Note:
         ${content}`,
@@ -200,22 +279,17 @@ const App = () => {
     const filenameTemplate = fileNameTemplate || "{{date}} {{time}} Idea";
     let filename = formatWithTokens(filenameTemplate);
     
-    // Sanitize filename: replace colons and slashes with dashes
     filename = filename.replace(/[:\/\\?%*|"<>]/g, '-');
 
-    // Trim vault name to ensure no trailing spaces cause "Vault Not Found" errors
     const encodedVault = encodeURIComponent(vaultName.trim());
     
-    // Construct file path: trim slash logic to ensure clean paths
     const cleanFolder = folderPath.trim().replace(/\/$/, ""); 
     const fullPath = cleanFolder ? `${cleanFolder}/${filename}` : filename;
     const encodedFile = encodeURIComponent(fullPath);
     
-    // Apply template before encoding
     const finalContent = formatWithTokens(template || "{{content}}", content);
     const encodedContent = encodeURIComponent(finalContent);
 
-    // Construct Obsidian URI
     const uri = `obsidian://new?vault=${encodedVault}&file=${encodedFile}&content=${encodedContent}`;
 
     window.location.href = uri;
@@ -251,11 +325,19 @@ const App = () => {
     folderPath: string;
     fileNameTemplate: string;
     template: string;
+    useBrowserFallback?: boolean;
+    browserLanguage?: string;
   }) => {
     setVaultName(newSettings.vaultName);
     setFolderPath(newSettings.folderPath);
     setFileNameTemplate(newSettings.fileNameTemplate);
     setTemplate(newSettings.template);
+    if (newSettings.useBrowserFallback !== undefined) {
+      setUseBrowserFallback(newSettings.useBrowserFallback);
+    }
+    if (newSettings.browserLanguage) {
+      setBrowserLanguage(newSettings.browserLanguage);
+    }
     setShowSettings(false);
     showToast("Settings saved", 'success');
   };
@@ -302,7 +384,9 @@ const App = () => {
             vaultName,
             folderPath,
             fileNameTemplate,
-            template
+            template,
+            useBrowserFallback,
+            browserLanguage
           }}
         />
       )}
@@ -332,7 +416,6 @@ const App = () => {
         </div>
       )}
       
-      {/* Global Styles for Animations */}
       <style>{`
         @keyframes pulse {
           0% { opacity: 1; }
