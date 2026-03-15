@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createRoot } from "react-dom/client";
-import { GoogleGenAI } from "@google/genai";
 
 import { Header } from "./components/Header";
 import { Editor } from "./components/Editor";
@@ -20,24 +19,24 @@ const App = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
-  
+
   // Toast State
   const [toast, setToast] = useState<{message: string, type: ToastType} | null>(null);
-  
+
   // Settings - Initialize from LocalStorage or Defaults
   const [vaultName, setVaultName] = useState(() => localStorage.getItem("obsidian_vault") || "");
   const [folderPath, setFolderPath] = useState(() => {
     const saved = localStorage.getItem("obsidian_folder");
-    return saved !== null ? saved : ""; 
+    return saved !== null ? saved : "";
   });
   const [fileNameTemplate, setFileNameTemplate] = useState(() => localStorage.getItem("obsidian_filename") || "{{date}} {{time}} Idea");
   const [template, setTemplate] = useState(() => localStorage.getItem("obsidian_template") || "{{content}}");
-  
+
   // NEW: Transcription settings
-  const [useBrowserFallback, setUseBrowserFallback] = useState(() => 
+  const [useBrowserFallback, setUseBrowserFallback] = useState(() =>
     localStorage.getItem("use_browser_fallback") !== "false"
   );
-  const [browserLanguage, setBrowserLanguage] = useState(() => 
+  const [browserLanguage, setBrowserLanguage] = useState(() =>
     localStorage.getItem("browser_language") || "zh-CN"
   );
 
@@ -78,7 +77,7 @@ const App = () => {
   // Browser Speech Recognition (Fallback)
   const handleBrowserSpeechRecognition = () => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    
+
     if (!SpeechRecognition) {
       showToast("Browser speech recognition not supported.", 'error');
       setIsProcessing(false);
@@ -87,11 +86,11 @@ const App = () => {
 
     const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
-    
+
     recognition.continuous = true;
     recognition.interimResults = false;
     recognition.lang = browserLanguage; // User-configurable
-    
+
     let finalTranscript = '';
 
     recognition.onstart = () => {
@@ -138,14 +137,14 @@ const App = () => {
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
+
       const supportedType = getSupportedMimeType();
       const options = supportedType ? { mimeType: supportedType } : undefined;
-      
+
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
-      
+
       recordingMimeTypeRef.current = supportedType || "";
 
       mediaRecorder.ondataavailable = (event) => {
@@ -189,27 +188,27 @@ const App = () => {
 
   const processAudio = async (audioBlob: Blob, mimeType: string) => {
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const base64Audio = await blobToBase64(audioBlob);
-      
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
-        contents: {
-          parts: [
-            {
-              inlineData: {
-                mimeType: mimeType, 
-                data: base64Audio
-              }
-            },
-            {
-              text: "Transcribe this audio. Auto-detect language (Chinese, English, or mixed). Transcribe exactly what is said, but fix minor stutters. Do not add any commentary."
-            }
-          ]
-        }
+
+      // Call serverless API instead of directly using Gemini
+      const response = await fetch('/api/transcribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          audioBlob: base64Audio,
+          mimeType: mimeType,
+          prompt: "Transcribe this audio. Auto-detect language (Chinese, English, or mixed). Transcribe exactly what is said, but fix minor stutters. Do not add any commentary."
+        }),
       });
 
-      const transcription = response.text || "";
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const transcription = data.text || "";
       setContent((prev) => prev + (prev ? "\n\n" : "") + transcription);
       showToast("Transcription complete (Gemini)", 'success');
     } catch (error) {
@@ -233,28 +232,25 @@ const App = () => {
     if (!content.trim()) return;
     setIsProcessing(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
-        contents: `You are an expert personal knowledge management assistant. 
-        Refine the following raw note into a clean, concise Markdown format.
-
-        STRICT RULES:
-        1. DO NOT include any introductory phrases like "Here is your note" or "Okay, I've cleaned it up".
-        2. DO NOT include any meta-commentary or conversational filler.
-        3. OUTPUT ONLY the refined note content itself.
-        4. Fix grammar and spelling.
-        5. If it looks like a task, format it as a checklist item.
-        6. Add a relevant #tag at the end based on the context.
-        7. Keep the tone personal.
-        8. Preserve the original language (Chinese stays Chinese, English stays English).
-        
-        Raw Note:
-        ${content}`,
+      // Call serverless API instead of directly using Gemini
+      const response = await fetch('/api/polish', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: content
+        }),
       });
 
-      if (response.text) {
-        setContent(response.text.trim());
+      if (!response.ok) {
+        throw new Error(`API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.text) {
+        setContent(data.text);
         showToast("Note polished!", 'success');
       }
     } catch (error) {
@@ -278,15 +274,15 @@ const App = () => {
 
     const filenameTemplate = fileNameTemplate || "{{date}} {{time}} Idea";
     let filename = formatWithTokens(filenameTemplate);
-    
+
     filename = filename.replace(/[:\/\\?%*|"<>]/g, '-');
 
     const encodedVault = encodeURIComponent(vaultName.trim());
-    
-    const cleanFolder = folderPath.trim().replace(/\/$/, ""); 
+
+    const cleanFolder = folderPath.trim().replace(/\/$/, "");
     const fullPath = cleanFolder ? `${cleanFolder}/${filename}` : filename;
     const encodedFile = encodeURIComponent(fullPath);
-    
+
     const finalContent = formatWithTokens(template || "{{content}}", content);
     const encodedContent = encodeURIComponent(finalContent);
 
@@ -345,20 +341,20 @@ const App = () => {
   return (
     <div style={STYLES.container}>
       {toast && (
-        <Toast 
-          message={toast.message} 
-          type={toast.type} 
-          onClose={() => setToast(null)} 
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
         />
       )}
 
-      <Header 
-        onCopy={handleCopy} 
+      <Header
+        onCopy={handleCopy}
         copyFeedback={copyFeedback}
-        onOpenSettings={() => setShowSettings(true)} 
+        onOpenSettings={() => setShowSettings(true)}
       />
 
-      <Editor 
+      <Editor
         content={content}
         setContent={setContent}
         isRecording={isRecording}
@@ -366,7 +362,7 @@ const App = () => {
         textareaRef={textareaRef}
       />
 
-      <Toolbar 
+      <Toolbar
         isRecording={isRecording}
         isProcessing={isProcessing}
         content={content}
@@ -377,7 +373,7 @@ const App = () => {
       />
 
       {showSettings && (
-        <SettingsModal 
+        <SettingsModal
           onClose={() => setShowSettings(false)}
           onSave={handleSaveSettings}
           currentSettings={{
@@ -399,14 +395,14 @@ const App = () => {
               This will permanently delete your current note. This action cannot be undone.
             </p>
             <div style={{display: 'flex', gap: '12px'}}>
-              <button 
-                style={{...STYLES.button, ...STYLES.secondaryBtn}} 
+              <button
+                style={{...STYLES.button, ...STYLES.secondaryBtn}}
                 onClick={() => setShowClearConfirm(false)}
               >
                 Cancel
               </button>
-              <button 
-                style={{...STYLES.button, backgroundColor: COLORS.danger, color: 'white', border: 'none', flex: 1}} 
+              <button
+                style={{...STYLES.button, backgroundColor: COLORS.danger, color: 'white', border: 'none', flex: 1}}
                 onClick={confirmClear}
               >
                 Clear
@@ -415,7 +411,7 @@ const App = () => {
           </div>
         </div>
       )}
-      
+
       <style>{`
         @keyframes pulse {
           0% { opacity: 1; }
